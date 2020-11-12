@@ -1,0 +1,282 @@
+---
+title: "Survey-data study-1"
+author: "Preeti Pathak"
+date: "Due 2017-12-13 at noon. Generated `r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+```{r setup R to load needed libraries, message=FALSE}
+knitr::opts_chunk$set(comment=NA)
+options(width = 70)
+
+library(MASS); library(tidyverse)
+## make sure these libraries are installed in R
+```
+
+```{r}
+library(pander); library(mice); library(Epi)
+library(gridExtra); library(vcd); library(Hmisc)
+library(mosaic); library(forcats); library(tidyverse);library(car)
+```
+# Analysis-1
+compairing means of two populations using independent t-test.
+
+Reserch question-: Study the difference in pulse rate among US born and non US born 431 students. 
+
+```{r}
+survey_2017<-read_csv("survey_2017.csv")%>%tbl_df()
+survey_2017
+```
+
+```{r overall numerical summary for analysis 1}
+survey_2017 %>%
+select(Pulse_rate, Born_US) %>%
+Hmisc::describe()
+```
+
+```{r}
+survey_2017a <- survey_2017 %>%
+filter(is.na(Born_US) != TRUE) %>%
+select(id,Pulse_rate, Born_US)
+survey_2017a
+```
+
+
+```{r}
+source("Love-boost.R")
+eda.2sam(outcome = survey_2017a$Pulse_rate, group = survey_2017a$Born_US,
+y.title = "Pulse rate",
+ov.title = "pulse rate by Birth in US for n = 50 EPBI 431 Students in 2017", notch = FALSE)
+```
+```{r Numerical summary analysis-1}
+pander(by(survey_2017a$Pulse_rate, survey_2017a$Born_US, mosaic::favstats))
+```
+```{r}
+pander(by(survey_2017a$Pulse_rate, survey_2017a$Born_US, Emp_Rule))
+```
+```{r calculating skew for analysis1}
+by(survey_2017a$Pulse_rate, survey_2017a$Born_US, skew1) 
+```
+ 
+```{r}
+wilcox.test(survey_2017a$Pulse_rate ~ survey_2017a$Born_US, conf.level = .90, conf.int = TRUE, exact = FALSE)
+```
+ 
+#Result-1
+Above samples show no significant skew value (above 0.2= significant skew). In this case it is assumed that samples are normally distributed. However sample size is significantly low to assume exact normal distribution. 
+There is not observed difference in the population mean pulse rate among US born and not US born students.  In this case median of the population is significantly different so Wilcoxon-Mann-Whitney rank sum test will be appropriate to compare two intervals of pulse rate.  
+
+Interpretation of Wilcoxon signed rank test
+The test located difference in the location -2, with 90% confidence interval (-7.9, 1.0).
+
+
+Boots stap interval are the most reliable to understand the diffrence between the pulse rate between US born and non US born students.Overall it is not significant between US born and non US born individuals. 
+ 
+
+
+# Analysis-2
+
+Compairing three population mean.
+Reserch question-: In this section caparison between current overall health and their pulse rate were made to understand if overall health reflect observed changes in pulse rate in class 2017.   
+
+```{r}
+by(survey_2017$Pulse_rate, survey_2017$Current_health, Hmisc::describe)
+```
+
+
+
+```{r analysis-2 file}
+survey_2017b<-survey_2017 %>%
+select(id, Pulse_rate, Current_health) 
+survey_2017b
+```
+```{r}
+
+survey_2017b$Current_health_recat <- fct_recode(as.factor(survey_2017b$Current_health),
+                                                "fair-good"="Fair",
+                                                "fair-good"="Good")
+```
+
+
+
+```{r}
+eda.2sam(outcome = survey_2017b$Pulse_rate, group = survey_2017b$Current_health,
+y.title = "Pulse rate",
+ov.title = "pulse rate by current health for n = 50 EPBI 431 Students in 2017", notch = FALSE)
+```
+
+
+```{r calculating skew for analysis2}
+by(survey_2017b$Pulse_rate, survey_2017b$Current_health, skew1) 
+```
+
+
+```{r}
+pairwise.t.test(survey_2017b$Pulse_rate, survey_2017b$Current_health, p.adjust = "bonferroni")
+```
+Pair wise T-test after Bonferroni correction did not give significant results (all values indicate 1 with only 10% significance level) so I considered using Tukey HSD approach to compare current health and pulse rate among 431 students.
+
+
+```{r}
+TukeyHSD(aov(survey_2017b$Pulse_rate ~ survey_2017b$Current_health), conf.level = 0.90)
+```
+```{r}
+plot(TukeyHSD(aov(survey_2017b$Pulse_rate ~ survey_2017b$Current_health), conf.level = 0.90), las = 1)
+```
+
+# Result-2
+No significant skew is observed (0.2 and above) in group excellent, good and fair group. However, very good group show significant skew(0.203). There is very small sample size in fair group (n=4). It is very hard to assume normality in this comparison. 
+If normal distribution is assumed, Pairwise Comparisons of Means using Bonferroni approach will be conservative method. I think tukey HSD approach yield a better comparison between current overall health and pulse rate in 431 class. 
+All 90% confidence intervals are overlapping shows that there is no statistical difference between current overall health and pulse rate among 431 students.
+ 
+
+
+
+# Analysis-3
+ Simple regression model.
+Research question-: pulse rate, current overall health and days exercise are correlated with each other.
+```{r}
+survey_2017c<-survey_2017 %>%
+select(id, Pulse_rate, Current_health,days_excercize ) 
+survey_2017c
+```
+```{r}
+source("Love-boost.R")
+pairs(~Pulse_rate+ factor(Current_health)+days_excercize,data=survey_2017c,
+      main= "Scatter plot pulse rate days excercize",
+      upper.panel= panel.smooth,
+      diag.panel= panel.hist,
+      lower.panel= panel.cor)
+```
+
+```{r}
+pulsemodel<-lm(Pulse_rate ~ factor(Current_health)+days_excercize, data=survey_2017c)
+```
+
+```{r}
+summary(pulsemodel)
+```
+
+With the simple regression model Combined, the current overall health and days exercise variables account for 10% of the variation in pulse rate among 431 students. There is a difference between multiple R square and adjusted R square.
+ 
+
+```{r}
+par(mfrow = c(2, 2))
+plot(pulsemodel)
+```
+
+```{r}
+pulsemodel1<- step(pulsemodel)
+```
+
+```{r}
+anova(lm(Pulse_rate ~ factor(Current_health)+days_excercize, data=survey_2017c))
+```
+
+```{r}
+boxCox(lm(Pulse_rate ~ factor(Current_health)+days_excercize, data=survey_2017c))
+```
+
+```{r}
+AIC(pulsemodel)
+```
+```{r}
+BIC(pulsemodel1)
+```
+# Result model
+All the fitted values of the residuals are near zero. 
+The plot QQ plot suggests some problems with assuming Normality for the residuals in this regression model.
+Some of the residuals ( resudual 50) are most influential (outliers)and they are situated in the cook's distance.
+BoxCox function did not suggest the transformation. 
+
+# Analysis-4
+Research question-: smocking 100 cigarettes associated with male and female in 431 class.
+
+```{r}
+survey_2017d<-survey_2017 %>%
+select(id, gender,ciggarates ) 
+survey_2017d
+```
+
+
+
+
+```{r}
+table(survey_2017d$gender, survey_2017d$ciggarates)
+```
+```{r}
+t1 <- table(survey_2017d$gender, survey_2017d$ciggarates)
+colnames(t1) <- c("smoke 100 ciggarates", "did not smoke 100 ciggarates")
+rownames(t1) <- c("female", "male")
+pander(addmargins(t1))
+```
+
+```{r}
+twoby2(t1 + 2, conf.level = 0.90)
+```
+```{r}
+fisher.test(t1)
+```
+
+# Result-4
+The individual probabilities of smoke 100 cigarettes among male and female students in 431 class. 
+Probability of male smoked 100 cigarettes is 0.75 at confidence interval (0.60, 0.9)
+
+. The relative risk of female smoked 100 cigarettes/ male smoked 100 cigarettes = 1.18. 
+
+
+. The odds ratio describing the odds of female smoked 100 cigarettes is lower than men = 2.75 but overall it is not significant at evident from 90% confidence interval.  
+
+
+The Fisher's Exact Test( because we have samll sample size), with a p value much greater than 0.1, we must retain the null hypothesis in this case, and we see no significant association between the rows and the columns at a 10% significance level.
+
+
+
+#Analysis-5
+Compairing three population praportions.
+Research question-: study the association between gender cigarettes and current overall health.
+```{r}
+survey_2017d<-survey_2017 %>%
+select(id, gender,ciggarates,Current_health)
+survey_2017d
+```
+
+```{r}
+table(survey_2017d$gender,survey_2017d$Current_health)
+```
+
+```{r}
+t2 <- table(survey_2017d$gender, survey_2017d$ciggarates,survey_2017d$Current_health )
+colnames(t2) <- c("smoke 100 ciggarates", "did not smoke 100 ciggarates")
+rownames(t2) <- c("female", "male")
+pander(addmargins(t2))
+```
+```{r}
+assoc(t2)
+```
+
+```{r}
+woolf_test(t2)
+```
+```{r}
+mantelhaen.test(t2, conf.level = .90)
+```
+
+# Result-5
+There violation of "Cochran conditions",  we have:
+. cells with 0 counts
+. Lower than 80% of the cells in our table with counts of 5 or higher in the above analysis. 
+I consider collapsing the above parameters but I leaned current overall health fair(n=4) criteria is not same as good and very good. 
+Further, Woolf test suggest that there is no 3 way association. 
+
+According to the Mantel-Haenszel test 
+point estimate for the common population odds ratio comparing current overall health with smoking 100 cigarettes in male and female is 6.86 with 90% confidence interval (1.23, 38.13).So we'd conclude
+that there is no statistically significant association current overall health and smoked 100 cigarettes between men and woman.
+
+
